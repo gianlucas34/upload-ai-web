@@ -1,4 +1,11 @@
-import { ChangeEvent, FormEvent, useMemo, useRef, useState } from 'react'
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { FileVideo, Upload } from 'lucide-react'
 import { fetchFile } from '@ffmpeg/util'
 import { Separator } from './ui/separator'
@@ -7,8 +14,12 @@ import { Textarea } from './ui/textarea'
 import { Button } from './ui/button'
 import { getFFmpeg } from '@/lib/ffmpeg'
 import { api } from '@/lib/axios'
+import { Status } from '@/types/Status'
+import { SetState } from '@/types/SetState'
 
-type Status = 'waiting' | 'converting' | 'uploading' | 'generating' | 'success'
+interface VideoInputFormProps {
+  setVideoId: SetState<string | null>
+}
 
 const statusMessages = {
   converting: 'Convertendo...',
@@ -17,7 +28,7 @@ const statusMessages = {
   success: 'Sucesso!',
 }
 
-export const VideoInputForm = () => {
+export const VideoInputForm = ({ setVideoId }: VideoInputFormProps) => {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('waiting')
   const promptInputRef = useRef<HTMLTextAreaElement>(null)
@@ -73,12 +84,14 @@ export const VideoInputForm = () => {
     setStatus('uploading')
 
     const response = await api.post('/video', formData)
+    const videoId = response.data.id
 
     setStatus('generating')
 
-    await api.post(`/video/${response.data.id}/transcription`, { prompt })
+    await api.post(`/video/${videoId}/transcription`, { prompt })
 
     setStatus('success')
+    setVideoId(videoId)
   }
 
   const previewURL = useMemo(() => {
@@ -87,6 +100,10 @@ export const VideoInputForm = () => {
     }
 
     return URL.createObjectURL(videoFile)
+  }, [videoFile])
+
+  useEffect(() => {
+    setStatus('waiting')
   }, [videoFile])
 
   return (
@@ -112,6 +129,7 @@ export const VideoInputForm = () => {
         id="video"
         type="file"
         accept="video/mp4"
+        disabled={status !== 'waiting' && status !== 'success'}
         className="sr-only"
         onChange={handleFileSelected}
       />
